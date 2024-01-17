@@ -23,10 +23,15 @@ void SmMeasure_init(){
     sm.npp = ACSM.npp;
     sm.omg = 0.0;
 }
-
+/* 无感FOC控制，扩展反电势(eemf) + 滑膜观测器(smo) + 锁相环(PLL) */
 void measurement(){
+    /*测量量如下：
+        电流量作为控制器的反馈量 和 滑膜观测器的输入量；
+        电压量作为滑膜观测器的输入量
+    */
     IS_C(0) = ACSM.ial;
     IS_C(1) = ACSM.ibe;
-    sm.omg = ACSM.x[2];
-    sm.theta_e = ACSM.x[3];
+    US_C(0) = ACSM.ual;
+    US_C(1) = ACSM.ube;
+
 }

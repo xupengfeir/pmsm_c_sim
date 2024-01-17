@@ -2,6 +2,7 @@
 #include "controller.h"
 #include "inverter.h"
 #include "measure.h"
+#include "smo_pll.h"
 
 static write_header_to_file(FILE* fw);
 static write_data_to_file(FILE* fw);
@@ -14,6 +15,7 @@ int main()
 	/* 系统初始化 */
 	SMachine_init();
 	SmMeasure_init();
+	SmoPLL_init();
 	controller_init();
 
 	FILE* fw;
@@ -45,6 +47,7 @@ int main()
 			dfe = 0;
 			CTRL.timebase += TS;
 			measurement();
+			Smo_Observation();
 			write_data_to_file(fw);
 			control(ACSM.rpm_cmd);	// 转/min
 		}
@@ -59,7 +62,7 @@ int main()
 }
 
 static write_header_to_file(FILE* fw){
-	fprintf(fw, "x0,x1,x2,x3,uMs_cmd,uTs_cmd,iMs_cmd,iMs,iTs_cmd,iTs\n");
+	fprintf(fw, "x0,x1,We,theta,uMs_cmd,uTs_cmd,iMs_cmd,iMs,iTs_cmd,iTs\n");
 }
 
 static write_data_to_file(FILE* fw){
@@ -67,7 +70,7 @@ static write_data_to_file(FILE* fw){
 	if(++j == 10){
 		j=0;
 		fprintf(fw, "%g,%g,%g,%g,%g,%g,%g,%g,%g,%g\n",
-				ACSM.x[0],ACSM.x[1],ACSM.x[2],ACSM.x[3],
+				ACSM.x[0],ACSM.x[1],smopll.we,smopll.theta_e,
 				CTRL.uDs_cmd, CTRL.uQs_cmd, CTRL.iDs_cmd, CTRL.iDs, CTRL.iQs_cmd, CTRL.iQs);
 	}
 }

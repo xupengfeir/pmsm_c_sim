@@ -1,5 +1,6 @@
 #include "ACMSim.h"
 #include "controller.h"
+#include "smo_pll.h"
 
 static void rK4_dynamics(double t, double *x, double *fx);
 static void rK4_line(double t, double *x, double hs);
@@ -23,6 +24,7 @@ void SMachine_init(){
     ACSM.R = 0.45;
 	ACSM.Ld = 4.15*1e-3;
 	ACSM.Lq = 16.74*1e-3;
+    ACSM.Ls = 0.5 * (ACSM.Ld + ACSM.Lq + (ACSM.Lq - ACSM.Ld)*cos(2*TWO_PI_OVER_3 + ONE_PI_OVER_3));  // 假设初始电角度为TWO_PI_OVER_3，不准没关系，后面观测器会计算角度
 	ACSM.rFlux = 0.504;
 	ACSM.L0 = 0.5*(ACSM.Ld + ACSM.Lq);
 	ACSM.L1 = 0.5*(ACSM.Ld - ACSM.Lq);
@@ -44,7 +46,8 @@ void SMachine_init(){
 
 	ACSM.ual = 0.0;
 	ACSM.ube = 0.0;
-	ACSM.theta_e = 0.0;    
+    // ACSM.omegae = 0.0;  // 电角速度，初始为0，由观测器获得
+	// ACSM.theta_e  ; 角度，初始位置未知
 }
 
 /* 电机微分方程数值解算
@@ -54,12 +57,12 @@ void SMachine_init(){
 static void rK4_dynamics(double t, double *x, double *fx){
     #if MACHINE_TYPE == SYNCHRONOUS_MACHINE
         //电机电气模型  这里fx是对应的x的一阶导数
-        fx[0] = (ACSM.ud - ACSM.R*x[0] + x[2]*ACSM.Lq*x[1]) / ACSM.Ld;
-        fx[1] = (ACSM.uq - ACSM.R*x[1] - x[2]*(ACSM.Ld*x[0] + ACSM.rFlux)) / ACSM.Lq;
+        fx[0] = (ACSM.ud - ACSM.R*x[0] + smopll.we*ACSM.Lq*x[1]) / ACSM.Ld;
+        fx[1] = (ACSM.uq - ACSM.R*x[1] - smopll.we*(ACSM.Ld*x[0] + ACSM.rFlux)) / ACSM.Lq;
         // 电机运动模型
         ACSM.Tem = 1.5*ACSM.npp*x[1]*(x[0]*(ACSM.Ld - ACSM.Lq) + ACSM.rFlux);
-        fx[2] = (ACSM.Tem - ACSM.Tload - ACSM.Bc*x[2])*ACSM.npp/ACSM.Js;
-        fx[3] = x[2];   //  dΘe/dt = we
+        // fx[2] = (ACSM.Tem - ACSM.Tload - ACSM.Bc*x[2])*ACSM.npp/ACSM.Js;   //  dwe/dt
+        // fx[3] = x[2];   //  dΘe/dt = we
     #endif
 }
 static void rK4_line(double t, double *x, double hs){
@@ -100,19 +103,17 @@ int machine_simulation(){
     rK4_line(CTRL.timebase, ACSM.x, ACSM.Ts);
     /* 更新电机完成一次仿真后的状态量 电流 转速*/
     #if MACHINE_TYPE == SYNCHRONOUS_MACHINE
-        ACSM.theta_e = ACSM.x[3];
+        ACSM.theta_e = smopll.theta_e;      // 赋观测器估计的电角度
         if (ACSM.theta_e > M_PI){
             ACSM.theta_e -= 2*M_PI;
         }else if (ACSM.theta_e < -M_PI){
             ACSM.theta_e += 2*M_PI;
         }
-        ACSM.x[3] = ACSM.theta_e;
-
         ACSM.id = ACSM.x[0];    // 微分方程解算出来的dq轴电流
         ACSM.iq = ACSM.x[1];
         ACSM.ial = DQ2A(ACSM.id, ACSM.iq, cos(ACSM.theta_e), sin(ACSM.theta_e));
         ACSM.ibe = DQ2B(ACSM.id, ACSM.iq, cos(ACSM.theta_e), sin(ACSM.theta_e));
-        ACSM.rpm = ACSM.x[2]*60 / (2*M_PI*ACSM.npp); 
+        ACSM.rpm = smopll.we*60 / (2*M_PI*ACSM.npp); 
     #endif
     /* 判断转速值是否有效 */
     if(isNumber(ACSM.rpm))

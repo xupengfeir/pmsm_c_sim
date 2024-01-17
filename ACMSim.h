@@ -18,7 +18,7 @@
     #define NULL_D_AXIS_CURRENT_CONTROL -1
     #define CONTROL_STRATEGY NULL_D_AXIS_CURRENT_CONTROL
     #define SENSORLESS_CONTROL false
-    #define NUM_OF_STATE    4       //状态量
+    #define NUM_OF_STATE    2       // 状态量 id,iq
 #endif 
 
 #define NUMBER_OF_SIM (200000)      // 仿真次数
@@ -45,7 +45,8 @@
 #define true 1
 #define false 0
 #define D2PI            0.15915494309189535     // 1/(2*pi)
-#define TWO_PI_OVER_3   2.0943951023931953      // (2*pi)/3
+#define TWO_PI_OVER_3   2.09439510239319549     // (2*pi)/3
+#define ONE_PI_OVER_3   1.04719755119659775     // (1*pi)/3
 #define SIN_2PID3       0.86602540378443871     // sin(2*pi/3)
 #define SIN_N_2PID3    -0.86602540378443871     // sin(-2*pi/3)
 #define SQRT_2D3        0.81649658092772603     // sqrt(2/3)
@@ -70,6 +71,7 @@ struct SychronousMachine{
 
     double Ld;      // d轴电感
     double Lq;      // q轴电感
+    double Ls;
     double L0;      // 静止坐标系下的量
     double L1;      // 同上
 
@@ -91,7 +93,7 @@ struct SychronousMachine{
     double uq;      // q轴电压
     double ual;
     double ube;
-
+    double omegae;  // 电角速度
     double theta_e; // 电气角度  d轴的alpha轴的角度
 };
 extern struct SychronousMachine ACSM;       // 命名：交流同步电机

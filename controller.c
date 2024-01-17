@@ -1,10 +1,7 @@
 #include "ACMSim.h"
 #include "controller.h"
 #include "measure.h"
-
-
-static double PI(struct PI_Reg *r, double err);
-
+#include "smo_pll.h"
 
 struct ControllerForPmsm CTRL;
 
@@ -95,10 +92,10 @@ static double PI(struct PI_Reg *r, double err){
 
 void control(double speed_cmd){
     /* 将 测量量(观测器或者编码器测量而来) 反馈给控制器 */
-    CTRL.omg_fb = sm.omg;
+    CTRL.omg_fb = smopll.we;
     CTRL.ial_fb = IS_C(0);
     CTRL.ibe_fb = IS_C(1);
-    CTRL.theta_e = sm.theta_e;
+    CTRL.theta_e = smopll.theta_e;
 
     /* id = 0的控制，磁链=电流*电感 */
     #if CONTROL_STRATEGY == NULL_D_AXIS_CURRENT_CONTROL
@@ -109,7 +106,7 @@ void control(double speed_cmd){
 
     /* 设置q轴电流， 速度环 */
     static int vc_count = 0;    // 速度环控制频率可以降低一点，频率小于电流环。对于复杂的观测器，它不希望速度环频繁地改变
-    if(vc_count++ == VC_LOOP_CEILING*DOWN_FREQ_EXE_INVERSE){
+    if(vc_count++ == VC_LOOP_CEILING*DOWN_FREQ_EXE_INVERSE){    // 20个电流环周期执行一个速度环周期
         vc_count = 0;
         CTRL.omg_ctrl_err  = speed_cmd * RPM_2_RAD_PER_SEC - CTRL.omg_fb;   //给定值 - 真实值 = err，此时输出 +PI
         CTRL.iQs_cmd = -PI(&CTRL.pi_speed, -CTRL.omg_ctrl_err);
